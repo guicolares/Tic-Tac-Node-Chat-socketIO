@@ -1,0 +1,287 @@
+h1 Jogo da Velha
+div(class='chat_content')
+  div(class='chat')
+    ul.messages
+  div(class='input_message')
+    form
+      input.inputMessage(placeholder='Write something...', id='m')
+      button(class="").
+       Enviar
+div(id="jogo_content")
+ div(id="placar")
+  span(style="float:left")
+    h1(id='stats')
+      span(id="turn")
+  
+  span(style="float:right")
+    h1(id='p1') Please Wait...
+    h1(id='p2') Please Wait... 
+ p &nbsp;
+ table(width='87%', border='1')
+  tr
+    td(width='33%',id='0-0')
+    td(width='33%',id='0-1')
+    td(width='33%',id='0-2')
+  tr
+    td(width='33%',id='1-0') 
+    td(width='33%', id='1-1')
+    td(width='33%', id='1-2') 
+  tr
+    td(width='33%', id='2-0')
+    td(width='33%', id='2-1')
+    td(width='33%', id='2-2')
+        
+
+script
+  var xo = 'x';
+  var gameover = false;
+  var startGame = false;
+  
+  //chats
+  var $window = $(window);
+  var $messages = $('.messages');
+  var $inputMessage = $('.inputMessage');
+  var $chatPage = $('.chat_content');
+  var COLORS = [
+    '#e21400', '#91580f', '#f8a700', '#f78b00',
+    '#58dc00', '#287b00', '#a8f07a', '#4ae8c4',
+    '#3b88eb', '#3824aa', '#a700ff', '#d300e7'
+  ];
+  var flag = false;
+  
+  function mark(cords)
+  {
+    if(startGame)
+    {
+      if(player.mark != xo)
+      {
+         $("#stats").html('Wait your turn!').hide().fadeIn(1000).fadeOut(1000);
+      }
+      else
+      {
+        if($.trim($(cords).html()) == '')
+        {
+          socket.emit("process_move", cords);
+        }
+        else
+        {
+          $("#stats").html('Invalid move').hide().fadeIn(1000).fadeOut(1000);
+        }
+      }
+    }
+    else
+    {
+      $("#stats").html('Searching player').hide().fadeIn(1000).fadeOut(1000);
+    }
+  }
+  
+  socket.on('mark', function(sq)
+  {
+      sq = '#' + sq;
+      if($.trim($(sq).html()) == '')
+      {
+        if( xo == 'x')
+        {
+          $(sq).html('X');
+          xo = 'o';
+          $(sq).css('color','red');
+        }
+        else
+        {
+          $(sq).html('O');
+          $(sq).css('color','blue');
+          xo = 'x';
+        }  
+     }
+  });
+  
+  $('#0-0').click(function()
+  {
+    mark("#0-0");
+  });
+  $('#0-1').click(function()
+  {
+    mark("#0-1");
+  });
+  $('#0-2').click(function()
+  {
+    mark("#0-2");
+  });
+  // Second row
+  $('#1-0').click(function()
+  {
+    mark("#1-0");
+  });
+  $('#1-1').click(function()
+  {
+    mark("#1-1");
+  });
+  $('#1-2').click(function()
+  {
+    mark("#1-2");
+  });
+  // Third Row
+  $('#2-0').click(function()
+  {
+    mark("#2-0");
+  });
+  $('#2-1').click(function()
+  {
+    mark("#2-1");
+  });
+  $('#2-2').click(function()
+  {
+    mark("#2-2");
+  });
+  
+  socket.on('load', function(data)
+  {
+     var x = 0;
+     var showedX, showedO = false;
+     console.log(data);
+     while( x < data.length )
+     {
+       if(data[x].mark == 'x')
+       {
+         $("#p1").html(data[x].name + ": <span style='color:red'>X</span>");
+         showedX = true;
+       }
+       else if(data[x].mark == 'o')
+       {
+         $("#p2").html(data[x].name + ": <span style='color:blue'>O</span>");
+         showedO = true;
+       }
+       x++;
+     }
+     
+     if(!showedX) $("#p1").html("Waiting Player...");
+     if(!showedO) $("#p2").html("Waiting Player...");
+     
+     if(showedX && showedO) startGame = true;
+     
+  });
+  
+  socket.on('connect_1', function(data){
+    player.id = data.id;
+    player.name = data.name;
+    player.mark = data.mark;
+
+  });
+  
+  socket.on('gameover', function(data){
+    console.log('gameover'); 
+    console.log(data);
+    gameover = true;
+    $("#stats").html("Game Over!").hide().fadeIn(1000);
+    alert('Game over. Winner: ' + data); 
+   // window.location = document.URL;
+  });
+  //commands chat
+  
+  
+  
+  // Sends a chat message
+  function sendMessage () {
+    var message = $inputMessage.val();
+    // Prevent markup from being injected into the message
+    message = cleanInput(message);
+    // if there is a non-empty message and a socket connection
+    if (message) {
+      $inputMessage.val('');
+      addChatMessage({
+        name: player.name,
+        message: message
+      });
+      // tell server to execute 'new message' and send along one parameter
+      socket.emit('new message', message);
+      flag = true;
+    }
+  }
+  // Prevents input from having injected markup
+  function cleanInput (input) {
+    return $('<div/>').text(input).text();
+  }
+  
+  // Adds the visual chat message to the message list
+  function addChatMessage (data, options) {
+    console.log(data); 
+    if(data.name == player.name && flag) {
+        flag = false;
+        return false;
+    }
+    console.log('addChatMessage');
+    // Don't fade the message in if there is an 'X was typing'
+    var $typingMessages = getTypingMessages(data);
+    options = options || {};
+    if ($typingMessages.length !== 0) {
+      options.fade = false;
+      $typingMessages.remove();
+    }
+
+    var $usernameDiv = $('<span class="username"/>')
+      .text(data.name + ':')
+      .css('color', getUsernameColor(data.name));
+    var $messageBodyDiv = $('<span class="messageBody">')
+      .text(data.message);
+
+    var typingClass = data.typing ? 'typing' : '';
+    var $messageDiv = $('<li class="message"/>')
+      .data('username', data.name)
+      .addClass(typingClass)
+      .append($usernameDiv, $messageBodyDiv);
+
+    addMessageElement($messageDiv, options);
+  }
+  
+  // Gets the 'X is typing' messages of a user
+  function getTypingMessages (data) {
+    return $('.typing.message').filter(function (i) {
+      return $(this).data('username') === data.name;
+    });
+  }
+  
+  // Gets the color of a username through our hash function
+  function getUsernameColor (username) {
+    // Compute hash code
+    var hash = 7;
+    for (var i = 0; i < username.length; i++) {
+       hash = username.charCodeAt(i) + (hash << 5) - hash;
+    }
+    // Calculate color
+    var index = Math.abs(hash % COLORS.length);
+    return COLORS[index];
+  }
+  
+  function addMessageElement (el, options) {
+    var $el = $(el);
+
+    // Setup default options
+    if (!options) {
+      options = {};
+    }
+    if (typeof options.fade === 'undefined') {
+      options.fade = true;
+    }
+    if (typeof options.prepend === 'undefined') {
+      options.prepend = false;
+    }
+
+    if (options.prepend) {
+      $messages.prepend($el);
+    } else {
+      $messages.append($el);
+    }
+    $messages[0].scrollTop = $messages[0].scrollHeight;
+  }
+  
+  
+  $('.input_message form button').on('click',function(){
+      sendMessage();
+      typing = false;
+      return false;
+  });
+  
+  socket.on('new message', function (data) {
+    addChatMessage(data);
+  });
+  
